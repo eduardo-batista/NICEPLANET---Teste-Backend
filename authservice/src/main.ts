@@ -2,12 +2,14 @@ import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { ValidationPipe } from '@nestjs/common';
+import { PrismaClientExceptionFilter } from './common/response.interceptor';
 
 async function bootstrap() {
   // Cria uma aplicação NestJS a partir do módulo principal (AppModule)
   const app = await NestFactory.create(AppModule);
 
   // Usa um pipe global de validação para validar automaticamente os dados de entrada
+  app.useGlobalFilters(new PrismaClientExceptionFilter())
   app.useGlobalPipes(new ValidationPipe())
 
   // Configura a documentação Swagger para a API
@@ -15,6 +17,7 @@ async function bootstrap() {
     .setTitle('Auth API') // Título da documentação
     .setDescription('Documentação da API de Autenticação') // Descrição da documentação
     .setVersion('1.0') // Versão da API
+    .addBearerAuth()
     .addTag('auth_service') // Adiciona uma tag para categorizar os endpoints
     .build();
 
