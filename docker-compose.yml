@@ -1,0 +1,105 @@
+version: "3.8"
+
+services:
+  rabbitmq:
+    image: rabbitmq:management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    healthcheck:
+      test: ["CMD-SHELL", "rabbitmq-diagnostics -q ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - auth-network
+      - crud-network
+
+  crud_service_db:
+    image: mysql:8.4
+    container_name: crud_service_db
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: crud_service_db
+      MYSQL_TCP_PORT: 3307
+    healthcheck:
+      test:
+        ["CMD-SHELL", "mysqladmin ping -h localhost -p$${MYSQL_ROOT_PASSWORD}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    volumes:
+      - ./crudservice/mysql-data:/var/lib/mysql
+    ports:
+      - "33061:3307"
+    networks:
+      - crud-network
+
+  crud_service_api:
+    build: ./crudservice
+    container_name: crud_service_api
+    depends_on:
+      crud_service_db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    ports:
+      - "3001:3000"
+    volumes:
+      - ./crudservice/src:/app/src
+      - ./crudservice/prisma:/app/prisma
+    environment:
+      - PORT=3000
+      - NODE_ENV=development
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+    networks:
+      - crud-network
+
+  auth_service_db:
+    container_name: auth_service_db
+    image: mysql:8.4
+    ports:
+      - "33062:3306"
+    environment:
+      MYSQL_ROOT_PASSWORD: root
+      MYSQL_DATABASE: auth_service_db
+    healthcheck:
+      test:
+        ["CMD-SHELL", "mysqladmin ping -h localhost -p$${MYSQL_ROOT_PASSWORD}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    volumes:
+      - ./authservice/mysql-data:/var/lib/mysql
+    networks:
+      - auth-network
+
+  auth_service_api:
+    container_name: auth_service_api
+    build:
+      context: ./authservice
+      dockerfile: Dockerfile
+    ports:
+      - "3002:3000"
+    environment:
+      - PORT=3000
+      - NODE_ENV=development
+      - RABBITMQ_HOST=rabbitmq
+      - RABBITMQ_PORT=5672
+    depends_on:
+      auth_service_db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    volumes:
+      - ./authservice/src:/app/src
+      - ./authservice/prisma:/app/prisma
+    networks:
+      - auth-network
+
+networks:
+  auth-network:
+    driver: bridge
+  crud-network:
+    driver: bridge

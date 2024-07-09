@@ -1,0 +1,10 @@
+node_modules
+test
+.gitignore
+.git
+.prettierrc
+Dockerfile
+docker-compose.yml
+README.md
+mysql-data
+.idea
